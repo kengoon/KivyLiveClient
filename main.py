@@ -110,12 +110,13 @@ class KivyLiveClient:
 
 
 if __name__ == "__main__":
-    observer = Observer()
     try:
-        observer.schedule(KivyFileListener(), path=sys.argv[1], recursive=True)
+        path = sys.argv[1]
     except IndexError:
         logging.error("add a directory. e.g: python main.py /path/to/file")
-    observer.start()
+        exit()
+    observer = Observer()
+    observer.schedule(KivyFileListener(), path=path, recursive=True)
     try:
         while True:
             sleep(1)

@@ -18,7 +18,7 @@ from kivy.core.window import Window  # NOQA: E402
 from kivymd.app import MDApp  # NOQA: E402
 import pickle
 # This is needed for supporting Windows 10 with OpenGL < v2.0
-from kivymd.toast import toast
+from kivymd.toast.kivytoast import toast
 
 if platform == "win":
     os.environ["KIVY_GL_BACKEND"] = "angle_sdl2"
@@ -40,9 +40,14 @@ class KivyLive(MDApp, HotReloaderApp):
         (".", {"recursive": True}),
     ]
 
+    AUTORELOADER_IGNORE_PATTERNS = [
+        "*.pyc", "*__pycache__*", "*p4a_env_vars.txt*", "*sitecustomize.py*", "*/.kivy*"
+    ]
+
     def __init__(self, **kwargs):
         super(KivyLive, self).__init__(**kwargs)
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.connected = False
         self.HEADER_LENGTH = 64
         Window.soft_input_mode = "below_target"
         self.title = "KivyLiveUi"
@@ -58,25 +63,47 @@ class KivyLive(MDApp, HotReloaderApp):
     def build_app(self):  # build_app works like build method
         return Factory.Root()
 
+    def on_rebuild(self, *args):
+        if self.connected:
+            print("change")
+            self.root.children[0].current = "home"
+
     def thread_server_connection(self, ip):
-        toast(f"establishing connection to {ip}:6050")
+        toast(f"establishing connection to {ip}:6051", background=self.theme_cls.primary_color) if ":" not in ip else \
+            toast(f"establishing connection to {ip.split(':')[0]}: {ip.split(':')[1]}",
+                  background=self.theme_cls.primary_color)
         Thread(target=self.connect2server, args=(ip,)).start()
 
     def connect2server(self, ip):
+        port = 6051
         try:
-            self.client_socket.connect((ip, 6051))
-            Clock.schedule_once(lambda x: toast("Connection Established Successfully"))
+            if ":" in ip:
+                port = ip.split(":")[1]
+            self.client_socket.connect((ip.split(":")[0], port))
+            self.connected = True
+            Clock.schedule_once(
+                lambda x: toast("Connection Established Successfully", background=self.theme_cls.primary_color))
             Logger.info(f"{ip}>6050: Connection Established")
             Thread(target=self.listen_4_update).start()
         except (OSError, socket.gaierror) as e:
+            self.connected = False
             exception = e
-            Clock.schedule_once(lambda x: toast(f"{exception}"))
+            Clock.schedule_once(lambda x: toast(f"{exception}", background=[1, 0, 0, 1]))
         except:
             pass
 
     def listen_4_update(self):
-        _header = self.client_socket.recv(self.HEADER_LENGTH)
-        load_initial_code = pickle.loads(self.client_socket.recv(int(_header)))
+        _header = int(self.client_socket.recv(self.HEADER_LENGTH))
+        _iter_chunks = _header // 4096
+        _chunk_remainder = _header % 4096
+        data = [
+            self.client_socket.recv(4096)
+            for _ in range(_iter_chunks)
+            if _iter_chunks >= 1
+        ]
+        data.append(self.client_socket.recv(_chunk_remainder))
+        data = b"".join(data)
+        load_initial_code = pickle.loads(data)
         for i in load_initial_code:
             file_path = os.path.split(i)[0]
             try:
@@ -89,28 +116,33 @@ class KivyLive(MDApp, HotReloaderApp):
                     os.path.join(file_path, os.path.split(i)[1]), "wb" if type(load_initial_code[i]) == bytes else "w"
             ) as f:
                 f.write(load_initial_code[i])
+                f.close()
         try:
             while True:
                 header = self.client_socket.recv(self.HEADER_LENGTH)
+                print(header)
                 if not len(header):
-                    Clock.schedule_once(lambda x: toast("SERVER DOWN: Shutting down the connection"))
+                    Clock.schedule_once(
+                        lambda x: toast("SERVER DOWN: Shutting down the connection", background=[1, 0, 0, 1])
+                    )
                     Logger.info("SERVER DOWN: Shutting down the connection")
                     break
                 message_length = int(header)
-                code_data = self.client_socket.recv(message_length).decode()
+                code_data = pickle.loads(self.client_socket.recv(message_length))
                 self.update_code(code_data)
         except:
-            Clock.schedule_once(lambda x: toast("SERVER DOWN: Shutting down the connection"))
+            Clock.schedule_once(lambda x: toast("SERVER DOWN: Shutting down the connection", background=[1, 0, 0, 1]))
             Logger.info("SERVER DOWN: Shutting down the connection")
 
-    @staticmethod
-    def update_code(code_data):
+    def update_code(self, code_data):
         # write code
         file = code_data["data"]["file"]
         with open(file, "w") as f:
             f.write(code_data["data"]["code"])
         Logger.info(f"FILE UPDATE: {file} was updated by {code_data['address']}")
-        Clock.schedule_once(lambda x: toast(f"{file} was updated by {code_data['address']}"))
+        Clock.schedule_once(
+            lambda x: toast(f"{file} was updated by {code_data['address']}", background=self.theme_cls.primary_color)
+        )
 
 
 if __name__ == "__main__":
