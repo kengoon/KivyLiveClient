@@ -113,6 +113,7 @@ if __name__ == "__main__":
         path = sys.argv[1]
     except IndexError:
         logging.error("add a directory. e.g: python main.py /path/to/file")
+        exit()
     observer = Observer()
     observer.schedule(KivyFileListener(), path=path, recursive=True)
     observer.start()
