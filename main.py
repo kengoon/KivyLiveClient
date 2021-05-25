@@ -36,7 +36,6 @@ class KivyFileListener(FileSystemEventHandler):
             self.client_socket.send_code(
                 f"{len(code_data):<{self.client_socket.HEADER_LENGTH}}".encode("utf-8") + code_data
             )
-            #self.client_socket.send_code(f"hello world".encode("utf-8"))
 
     def on_created(self, event):
         self.filepath = event.src_path.strip("~")
@@ -104,7 +103,7 @@ class KivyLiveClient:
     def update_code(code_data):
         # write code
         file = code_data["data"]["file"]
-        with open(file if file != "main.py" else "liveappmain.py", "w") as f:
+        with open(file, "w") as f:
             f.write(code_data["data"]["code"])
         Logger.info(f"FILE UPDATE: {file} was updated by {code_data['address']}")
 
@@ -114,9 +113,9 @@ if __name__ == "__main__":
         path = sys.argv[1]
     except IndexError:
         logging.error("add a directory. e.g: python main.py /path/to/file")
-        exit()
     observer = Observer()
     observer.schedule(KivyFileListener(), path=path, recursive=True)
+    observer.start()
     try:
         while True:
             sleep(1)
