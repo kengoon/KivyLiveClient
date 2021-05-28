@@ -28,7 +28,7 @@ class KivyFileListener(FileSystemEventHandler):
 
     def on_modified(self, event):
         filename = os.path.basename(self.filepath).strip("~")
-        if filename.endswith("main.py") or not self.filepath:
+        if filename == "main.py" or not self.filepath:
             return
         binary = is_binary(open(self.filepath, "rb").read(1024))
         with open(self.filepath, "rb" if binary else "r") as file:
