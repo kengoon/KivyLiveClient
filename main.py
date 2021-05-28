@@ -102,9 +102,14 @@ class KivyLiveClient:
     @staticmethod
     def update_code(code_data):
         # write code
+        global path
         file = code_data["data"]["file"]
-        with open(file, "w") as f:
-            f.write(code_data["data"]["code"])
+        if os.path.abspath(".") == os.getcwd():
+            with open(os.path.join(path, file) if file != "main.py" else "liveappmain.py", "w") as f:
+                f.write(code_data["data"]["code"])
+        else:
+            with open(os.path.join(path, file), "w") as f:
+                f.write(code_data["data"]["code"])
         Logger.info(f"FILE UPDATE: {file} was updated by {code_data['address']}")
 
 
