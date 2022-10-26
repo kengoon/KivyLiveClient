@@ -1,5 +1,4 @@
 import pickle
-from json import dumps
 from time import sleep
 import os
 from watchdog.events import FileSystemEventHandler
@@ -54,7 +53,7 @@ class KivyLiveClient:
     def __init__(self, **kwargs):
         self.HEADER_LENGTH = 64
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.client_socket.connect(("0.0.0.0", 6051))
+        self.client_socket.connect(("0.0.0.0", 5567))
         # self.client_socket.setblocking(False)
         Thread(target=self.recv_code).start()
 
@@ -62,27 +61,27 @@ class KivyLiveClient:
         self.client_socket.send(code_data)
 
     def recv_code(self):
-        _header = self.client_socket.recv(self.HEADER_LENGTH)
-        load_initial_code = pickle.loads(self.client_socket.recv(int(_header)))
-        for i in load_initial_code:
-            file_path = os.path.split(i)[0]
-            try:
-                os.makedirs(file_path)
-            except FileExistsError as e:
-                Logger.debug(f"{e} : Ignore this")
-            if os.path.split(i)[1] == "main.py":
-                with open(
-                        os.path.join(file_path, "liveappmain.py"),
-                        "wb" if type(load_initial_code[i]) == bytes else "w"
-                ) as f:
-                    f.write(load_initial_code[i])
-            else:
-                with open(
-                        os.path.join(file_path, os.path.split(i)[1]),
-                        "wb" if type(load_initial_code[i]) == bytes else "w"
-                ) as f:
-                    f.write(load_initial_code[i])
         try:
+            _header = self.client_socket.recv(self.HEADER_LENGTH)
+            load_initial_code = pickle.loads(self.client_socket.recv(int(_header)))
+            for i in load_initial_code:
+                file_path = os.path.split(i)[0]
+                try:
+                    os.makedirs(file_path)
+                except FileExistsError as e:
+                    Logger.debug(f"{e} : Ignore this")
+                if os.path.split(i)[1] == "main.py":
+                    with open(
+                            os.path.join(file_path, "liveappmain.py"),
+                            "wb" if type(load_initial_code[i]) == bytes else "w"
+                    ) as f:
+                        f.write(load_initial_code[i])
+                else:
+                    with open(
+                            os.path.join(file_path, os.path.split(i)[1]),
+                            "wb" if type(load_initial_code[i]) == bytes else "w"
+                    ) as f:
+                        f.write(load_initial_code[i])
             while True:
                 header = self.client_socket.recv(self.HEADER_LENGTH)
                 if not len(header):
@@ -92,8 +91,9 @@ class KivyLiveClient:
                 code_data = self.client_socket.recv(message_length).decode()
                 self.update_code(code_data)
             interrupt_main()
-        except KeyboardInterrupt:
-            pass
+        except (KeyboardInterrupt, ValueError):
+            Logger.info("SERVER DOWN: Shutting down the connection")
+            interrupt_main()
 
         except:
             Logger.info("SERVER DOWN: Shutting down the connection")
